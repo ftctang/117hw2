@@ -45,6 +45,7 @@ int main (int argc, char *argv[])
   char hostname[MPI_MAX_PROCESSOR_NAME+1];
   int namelen = 0;
 
+  
   FILE *fp = NULL; /* output file, only valid on rank 0 */
 
   int* msgbuf = NULL;
@@ -96,6 +97,7 @@ int main (int argc, char *argv[])
   if (rank == 0) {
     fclose (fp); /* Close results.dat */
   }
+  
   MPI_Finalize ();
   return 0;
 }
