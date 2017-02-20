@@ -39,8 +39,23 @@ main (int argc, char* argv[])
   double maxX = 0.7;
   double minY = -1.25;
   double maxY = 1.25;
+  double t_start, t_elapsed;
   
   int height, width;
+  
+  int rank = 0, size = 0, namelen = 0;
+  char hostname[MPI_MAX_PROCESSOR_NAME+1];
+  
+  MPI_Init(&argc, &argv); //starts MPI
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank); //get process id
+  MPI_Comm_size(MPI_COMM_WORLD, &size); //get number of processes
+  MPI_Get_processor_name(hostname, &namelen); //get hostname of nodes
+  
+  //timer start
+  if(rank == 0){
+	  t_start = MPI_WTime();
+  }
+  
   if (argc == 3) {
     height = atoi (argv[1]);
     width = atoi (argv[2]);
@@ -58,17 +73,48 @@ main (int argc, char* argv[])
 
   gil::rgb8_image_t img(height, width);
   auto img_view = gil::view(img);
-
+  
+  //array setup
+  float S = width * size; // susie's block
+  float *rbuffer = new float[width*height];
+  float *temp = new float[S * height];
+  float **image = new float *[height];
+  
+  for(int j = 0; j < height; j++){
+	  image[j] = new float[width];
+  }
+  
+  
+  //mandelbrot
   y = minY;
   for (int i = 0; i < height; ++i) {
-    x = minX;
-    for (int j = 0; j < width; ++j) {
-      img_view(j, i) = render(mandelbrot(x, y)/512.0);
+    x = minX + rank + S * jt;
+    for (int j = 0; j < i * S; ++j) {
+      temp[i*width + j] = mandelbrot(x, y)/512.0;
       x += jt;
     }
     y += it;
   }
-  gil::png_write_view("mandelbrot.png", const_view(img));
+  
+  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Gather(temp, S * height, MPI_FLOAT, rbuffer, S * height, MPI_FLOAT, 0, MPI_COMM_WORLD);
+  
+  if(rank == 0){
+	  for(int i = 0; i < height; ++i){
+		  for(int j = 0; j < width; ++j){
+			  image[i][j] = rbuffer[i*width + j];
+			  img_view(j, i) = render(image[i][j]);
+		  }
+	  }
+	  gil::png_write_view("mandelbrot.png", const_view(img));
+  }
+  
+  
+  MPI_Finalize();
+  if(rank == 0){
+	  t_elapsed = MPI_Wtime() - t_start;
+	  printf("Timestamp: %f\n", t_elapsed);
+  }
 }
 
 /* eof */
