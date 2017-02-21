@@ -43,17 +43,17 @@ main (int argc, char* argv[])
   
   int height, width;
   
-  int rank = 0, size = 0, namelen = 0;
+  int rank = 0, np = 0, namelen = 0;
   char hostname[MPI_MAX_PROCESSOR_NAME+1];
   
   MPI_Init(&argc, &argv); //starts MPI
   MPI_Comm_rank(MPI_COMM_WORLD, &rank); //get process id
-  MPI_Comm_size(MPI_COMM_WORLD, &size); //get number of processes
+  MPI_Comm_size(MPI_COMM_WORLD, &np); //get number of processes
   MPI_Get_processor_name(hostname, &namelen); //get hostname of nodes
   
   //timer start
   if(rank == 0){
-	  t_start = MPI_WTime();
+	  t_start = MPI_Wtime();
   }
   
   if (argc == 3) {
@@ -75,38 +75,38 @@ main (int argc, char* argv[])
   auto img_view = gil::view(img);
   
   //array setup
-  float S = width * size; // susie's block
   float *rbuffer = new float[width*height];
-  float *temp = new float[S * height];
+  float *temp = new float[height*width];
   float **image = new float *[height];
-  
+
   for(int j = 0; j < height; j++){
-	  image[j] = new float[width];
+          image[j] = new float[width];
   }
   
+  int n = 0;
   
   //mandelbrot
   y = minY;
-  for (int i = 0; i < height; ++i) {
-    x = minX + rank + S * jt;
-    for (int j = 0; j < i * S; ++j) {
-      temp[i*width + j] = mandelbrot(x, y)/512.0;
+  for (int i = rank + np * n; i < height; ++n) {
+    x = minX;
+    for (int j = 0; j < width; ++j) {
+      temp[i + j] = mandelbrot(x, y)/512.0;
       x += jt;
     }
     y += it;
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  MPI_Gather(temp, S * height, MPI_FLOAT, rbuffer, S * height, MPI_FLOAT, 0, MPI_COMM_WORLD);
+  MPI_Gather(temp, np * (height-1), MPI_FLOAT, rbuffer, np * (height-1), MPI_FLOAT, 0, MPI_COMM_WORLD);
   
   if(rank == 0){
 	  for(int i = 0; i < height; ++i){
 		  for(int j = 0; j < width; ++j){
-			  image[i][j] = rbuffer[i*width + j];
+			  image[i][j] = rbuffer[i + j];
 			  img_view(j, i) = render(image[i][j]);
 		  }
 	  }
-	  gil::png_write_view("mandelbrot.png", const_view(img));
+	  gil::png_write_view("mandelbrotsusie.png", const_view(img));
   }
   
   
