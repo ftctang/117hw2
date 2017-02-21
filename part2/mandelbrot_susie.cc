@@ -56,6 +56,7 @@ main (int argc, char* argv[])
 	  t_start = MPI_Wtime();
   }
   
+  //retrieve dimensions of the image from user input
   if (argc == 3) {
     height = atoi (argv[1]);
     width = atoi (argv[2]);
@@ -69,59 +70,58 @@ main (int argc, char* argv[])
   double it = (maxY - minY)/height;
   double jt = (maxX - minX)/width;
   double x, y;
-
-
-  gil::rgb8_image_t img(height, width);
-  auto img_view = gil::view(img);
   
   //array setup
-  float *rbuffer = new float[width*height];
-  float *temp = new float[height/np*width];
-  float **image = new float *[height];
-
-  for(int j = 0; j < height; j++){
-          image[j] = new float[width];
-  }
-  
+  int rows = (height / np) + 1; 	
+  int length = rows * width;		
+  int *rbuffer = new int[length];	//size of buffer
   int n = 0;
   
   //mandelbrot
-  y = minY;
-  for (int i = rank + np * n; i < height; ++i) {
-	i = rank + np * n;
-	if(i < height){
-		x = minX;
-		for (int j = 0; j < width; ++j) {
-			temp[i * width + j] = mandelbrot(x, y)/512.0;
-			x += jt;
-    }
-		y += it;
-		n++;
+  y = minY + (rank * it);
+  int row = 0;
+  for (int i = rank; i < height; i += np) {
+	x = minX;
+	for (int j = 0; j < width; ++j) {
+		rbuffer[(row * width) + j] = mandelbrot(x, y);
+		x += jt;
 	}
-    
+	y += (it * np);
+    row++;
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  MPI_Gather(temp, height/np * width, MPI_FLOAT, rbuffer, height/np * width, MPI_FLOAT, 0, MPI_COMM_WORLD);
   
-  
-  //still needs to be fixed
+  //receiving data
+  int* R = NULL;
   if(rank == 0){
+	  R = new int[length * np];
+  }
+  
+  //gather all data from each processor
+  MPI_Gather(rbuffer, length, MPI_INT, R, length, MPI_INT, 0, MPI_COMM_WORLD);
+  
+  //output the image
+  if(rank == 0){
+	    gil::rgb8_image_t img(height, width);
+		auto img_view = gil::view(img);
+		int o = 0;
+		int p = 0;
+	  
 	  for(int i = 0; i < height; ++i){
 		  for(int j = 0; j < width; ++j){
-			  image[i][j] = rbuffer[i * width + j];
-			  img_view(j, i) = render(image[i][j]);
+			  o = (i % np) * length;
+			  img_view(j, i) = render(R[o + (p * width) + j] / 512.0);
 		  }
+		  p = i / np;
 	  }
+	  t_elapsed = MPI_Wtime() - t_start;
+	  printf("Timestamp: %f\n", t_elapsed);
 	  gil::png_write_view("mandelbrotsusie.png", const_view(img));
   }
   
   
   MPI_Finalize();
-  if(rank == 0){
-	  t_elapsed = MPI_Wtime() - t_start;
-	  printf("Timestamp: %f\n", t_elapsed);
-  }
 }
 
 /* eof */
