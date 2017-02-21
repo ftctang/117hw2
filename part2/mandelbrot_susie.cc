@@ -76,7 +76,7 @@ main (int argc, char* argv[])
   
   //array setup
   float *rbuffer = new float[width*height];
-  float *temp = new float[height*width];
+  float *temp = new float[height/np*width];
   float **image = new float *[height];
 
   for(int j = 0; j < height; j++){
@@ -87,22 +87,29 @@ main (int argc, char* argv[])
   
   //mandelbrot
   y = minY;
-  for (int i = rank + np * n; i < height; ++n) {
-    x = minX;
-    for (int j = 0; j < width; ++j) {
-      temp[i + j] = mandelbrot(x, y)/512.0;
-      x += jt;
+  for (int i = rank + np * n; i < height; ++i) {
+	i = rank + np * n;
+	if(i < height){
+		x = minX;
+		for (int j = 0; j < width; ++j) {
+			temp[i * width + j] = mandelbrot(x, y)/512.0;
+			x += jt;
     }
-    y += it;
+		y += it;
+		n++;
+	}
+    
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  MPI_Gather(temp, np * (height-1), MPI_FLOAT, rbuffer, np * (height-1), MPI_FLOAT, 0, MPI_COMM_WORLD);
+  MPI_Gather(temp, height/np * width, MPI_FLOAT, rbuffer, height/np * width, MPI_FLOAT, 0, MPI_COMM_WORLD);
   
+  
+  //still needs to be fixed
   if(rank == 0){
 	  for(int i = 0; i < height; ++i){
 		  for(int j = 0; j < width; ++j){
-			  image[i][j] = rbuffer[i + j];
+			  image[i][j] = rbuffer[i * width + j];
 			  img_view(j, i) = render(image[i][j]);
 		  }
 	  }
