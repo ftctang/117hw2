@@ -1,6 +1,6 @@
 /**
  *  \file mandelbrot_serial.cc
- *  \brief Lab 2: Mandelbrot set serial code
+ *  \brief Lab 2: Mandelbrot set Joe Block code
  */
 
 
@@ -10,9 +10,6 @@
 #include "render.hh"
 
 using namespace std;
-
-#define WIDTH 1000
-#define HEIGHT 1000
 
 int
 mandelbrot(double x, double y) {
@@ -37,8 +34,9 @@ main(int argc, char* argv[]) {
   int np = 0 ;
   int rank = 0 ;
   int namelen = 0;
+  
   char hostname[MPI_MAX_PROCESSOR_NAME+1];
-
+  FILE *fp = NULL; /* output file, only valid on rank 0 */
   MPI_Init (&argc, &argv);	/* starts MPI */
   MPI_Comm_rank (MPI_COMM_WORLD, &rank);	/* Get process id */
   MPI_Comm_size (MPI_COMM_WORLD, &np);	/* Get number of processes */ 
@@ -54,6 +52,8 @@ main(int argc, char* argv[]) {
 
   if(rank ==  0){
 	t_start = MPI_Wtime (); /* Start timer */  
+	fp = fopen("joe_results.dat", "w");
+    assert (fp != NULL);
   }
   
  
@@ -70,7 +70,9 @@ main(int argc, char* argv[]) {
     fprintf (stderr, "where <height> and <width> are the dimensions of the image.\n");
     return -1;
   }
-  
+  // for (height = 100 ; height < 10000 ; height += 100 ){
+//	  width = height;
+ 
   double it = (maxY - minY)/height;
   double jt = (maxX - minX)/width;
   double x, y;
@@ -85,6 +87,7 @@ main(int argc, char* argv[]) {
   float *temp = new float[ N * width] ; 
   float **image = new float *[height];
   
+
   for(int i = 0 ; i < height ; i++){ //Setting up a 2D array 
 	  image[i] = new float[width];
   }
@@ -118,12 +121,20 @@ main(int argc, char* argv[]) {
   }
   
   
-  MPI_Finalize();
+	MPI_Finalize();
   if(rank == 0){
 	t_elapsed = MPI_Wtime () - t_start; /* Stop timer */
+    fprintf (fp, "%d\t%.10f\n", width*height, t_elapsed);
+    fflush (fp);
+	fclose(fp);
 	printf("Timestamp: %f\n", t_elapsed);
+	free(rbuffer);
+	free(image);
+	free(temp);
   }
-
+  
+  //}
+  
 }
 
 /* eof */

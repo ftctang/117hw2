@@ -1,6 +1,7 @@
 /**
  *  \file mandelbrot_serial.cc
- *  \brief Lab 2: Mandelbrot set serial code
+ *  \brief Lab 2: Mandelbrot set master slave code
+ Refrence: https://service.clustervision.com/content/example-mpi-communication-skeleton
  */
 
 
@@ -47,6 +48,7 @@ int master(double minX , double minY , double maxX , double maxY , double it , d
 	MPI_Status status ;
 	double t_start , t_elapsed ; 
     t_start = MPI_Wtime (); /* Start timer */
+	
 	/* Seed Slaves*/
 	for(rank = 1 ; rank < ntasks; ++rank){
 		MPI_Send(&RowNum, 1 , MPI_INT , rank , 0 , MPI_COMM_WORLD ) ;
@@ -117,11 +119,11 @@ int slave(double minX , double minY , double maxX , double maxY , double it , do
 			MPI_Send(&sbuffer, width+1 , MPI_INT, 0 , 1, MPI_COMM_WORLD );
 		}
 		
-		else if(status.MPI_TAG == 2 ){
+		else if(status.MPI_TAG == 2 ){//Stall process 
 			MPI_Send(&sbuffer, width+1 , MPI_INT, 0 , 2, MPI_COMM_WORLD );
 		}
 		
-		else{
+		else{//KIll PROCESS
 			return 0;
 		}
 		
